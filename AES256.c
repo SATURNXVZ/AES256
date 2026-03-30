@@ -216,6 +216,12 @@ static const uint8_t invSbox[256] = {
     0x17, 0x2b, 0x04, 0x7e, 0xba, 0x77, 0xd6, 0x26, 0xe1, 0x69, 0x14, 0x63, 0x55, 0x21, 0x0c, 0x7d
 };
 
+void sha256(const uint8_t *data, size_t len, uint8_t *hash) {
+    SHA256_CTX ctx;
+    sha256_init(&ctx);
+    sha256_update(&ctx, data, len);
+    sha256_final(&ctx, hash);
+}
 
 //printa os bytes em hexadecimial
 void printHex(const uint8_t *data, int tam){
@@ -482,13 +488,6 @@ int invPadding(uint8_t *cripto, int tam){
    return tam - value;
 }
 
-void sha256(const uint8_t *data, size_t len, uint8_t *hash) {
-    SHA256_CTX ctx;
-    sha256_init(&ctx);
-    sha256_update(&ctx, data, len);
-    sha256_final(&ctx, hash);
-}
-
 
 //funcao principal da descripto (AES-256)
 void invAES(const uint8_t *cripto, const uint8_t roundKeys[AES_ROUND_KEYS][16], uint8_t *text) {
@@ -584,7 +583,8 @@ int main() {
     //4- Mensagem do usuario
     uint8_t mensagem[buffer];
     printf("\n\nDigite a mensagem: ");
-    fgets((char*)mensagem)[strcspn((char*) mensagem, "\n")] = 0;
+    fgets((char*)mensagem, buffer, stdin);
+    ((char*) mensagem)[strcspn((char*) mensagem, "\n")] = 0;
 
     //calcula o tamanho 
     int tam = strlen((char* ) mensagem);
@@ -593,7 +593,7 @@ int main() {
     int newTam = padding(mensagem, tam);
     if(newTam == -1) return -1;
 
-    printf("\nMensagem com Padding (&d bytes): ");
+    printf("\nMensagem com Padding (%d bytes): ");
     printHex(mensagem, newTam);
 
     //IV pra cbc
@@ -632,6 +632,38 @@ int main() {
     for(int bloco = 0; bloco < numBlocos; bloco++){
         int offset =  bloco * 16;
         
+        //guarda o bloco criptografado antes 
+        uint8_t criptoBlock[16];
+        memcpy(criptoBlock, &cripto[offset], 16);
+
+        //chama AES para descripto
+        invAES(&cripto[offset], roundKeys, &decripto[offset]);
+
+        //xor com bloco anterior (usa cbc)
+        for(int i = 0; i < 16; i++){
+            decripto[offset +i] ^= anterior[i];
+        }
+
+        //atualziar anterior com bloco cifrado original
+        memcpy(anterior, criptoBlock, 16);
+    }
+
+        // Remove o padding
+    int tam_final = invPadding(decripto, newTam);
+    if(tam_final == -1) return -1;
+
+    // Mostra o resultado
+    printf("\nMensagem decifrada (%d bytes): ", tam_final);
+    for(int i = 0; i < tam_final; i++){
+        printf("%c", decripto[i]);
+    }
+    printf("\n");
+
+    // Verifica se voltou ao original
+    if(tam_final == tam && memcmp(mensagem, decripto, tam_final) == 0){
+        printf("\n✅ SUCESSO! Mensagem voltou ao original!\n");
+    } else {
+        printf("\n❌ ERRO! Mensagem não voltou corretamente.\n");
     }
 
     
