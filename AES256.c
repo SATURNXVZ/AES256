@@ -661,9 +661,9 @@ int main() {
 
     // Verifica se voltou ao original
     if(tam_final == tam && memcmp(mensagem, decripto, tam_final) == 0){
-        printf("\n✅ SUCESSO! Mensagem voltou ao original!\n");
+        printf("\nMensagem voltou ao original\n");
     } else {
-        printf("\n❌ ERRO! Mensagem não voltou corretamente.\n");
+        printf("\nERRO! Mensagem não voltou ao original.\n");
     }
 
     
