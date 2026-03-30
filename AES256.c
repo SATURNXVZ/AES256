@@ -584,6 +584,57 @@ int main() {
     //4- Mensagem do usuario
     uint8_t mensagem[buffer];
     printf("\n\nDigite a mensagem: ");
-    fgets((char*)mensagem [strcspn((char*) mensagem, "\n")] = 0; 
+    fgets((char*)mensagem)[strcspn((char*) mensagem, "\n")] = 0;
+
+    //calcula o tamanho 
+    int tam = strlen((char* ) mensagem);
+
+    //novo padding com tamanho atual
+    int newTam = padding(mensagem, tam);
+    if(newTam == -1) return -1;
+
+    printf("\nMensagem com Padding (&d bytes): ");
+    printHex(mensagem, newTam);
+
+    //IV pra cbc
+    uint8_t iv[16] = {0}; // 0 pra testes
+
+    //criptografando
+    uint8_t cripto[buffer];
+    uint8_t anterior[16];
+    memcpy(anterior, iv, 16);
+
+    int numBlocos = newTam /16;
+
+    for(int bloco = 0; bloco < numBlocos; bloco++){
+        int offset = bloco * 16;
+
+        //xor com bloco anterior (CBC)
+        for(int i = 0; i < 16; i++){
+            mensagem[offset + i] ^= anterior[i];
+        }
+
+        //encriptografa AES
+        AES(&mensagem[offset], roundKeys, &cripto[offset]);
+
+        //Atualiza anterior para o próximo bloco
+        memcpy(anterior, &cripto[offset], 16);
+    }
+        
+    printf("\nTexto cifrado: ");
+    printHex(cripto, newTam);
+
+
+    //descriptografa
+    uint8_t decripto[buffer];
+    memcpy(anterior, iv, 16);
+
+    for(int bloco = 0; bloco < numBlocos; bloco++){
+        int offset =  bloco * 16;
+        
+    }
+
+    
+    return 0;
 
 }
