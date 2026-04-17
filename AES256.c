@@ -3,9 +3,10 @@
 #include <stdint.h> 
 #include <string.h>
 #include <memory.h>
+#include <time.h>
 
 
-#define msg 40 //tamanho máximo do texto
+#define msg 100 //tamanho máximo do texto
 #define buffer (msg + 16) //tamanho máximo de capacidade de espaço (para padding)
 
 
@@ -371,8 +372,35 @@ void mixColumns(uint8_t estado[4][4]){
     }
 }
 
-void keyDerive(const char *senha, uint8_t *chave) {
-    sha256((const uint8_t*)senha, strlen(senha), chave);
+void keyDerive(const char *senha, uint8_t *salt, const uint8_t *chave){
+    uint8_t u[32], t[32]; //u = tentativa atual, t = soma das tentativas (acumulando)
+    uint8_t buff[128]; //buffer pra senha + salt
+
+    int tamSenha = strlen(senha);
+
+    //copia senha pro buffer
+    memcpy(buff, senha, tamSenha);
+    memcpy(buff + tamSenha, tamSenha, 16);
+
+    buff[tamSenha + 16] = 0;
+    buff[tamSenha + 17] = 0;
+    buff[tamSenha + 18] = 0;
+    buff[tamSenha + 19] = 1;
+
+    //sha256 do buffer
+    //criando primeira "iteração"
+    sha256(buff, tamSenha + 20, u);
+    memcpy(t, u, 32);
+
+    //iteração principal
+    for(int i = 1; i < 1000000; i++){
+        sha256(u, 32, u);
+        for(int j = 0; j < 32; j++){
+            t[j] ^= u[j];
+        }
+    }
+
+    memcpy(chave, t, 32);
 }
 
 // Faz XOR do estado com a chave da rodad
@@ -391,7 +419,7 @@ static const uint8_t rcon[11] = {
 
 // Key Expansion para AES-256
 void keyExpansion(const uint8_t *chave, uint8_t roundKey[AES_ROUND_KEYS][16]) {
-    // Copia chave original (32 bytes) para as primeiras 8 palavras (32 bytes)
+    // Copia chave original (32 bytes) p    ara as primeiras 8 palavras (32 bytes)
     for(int i = 0; i < AES_KEY_SIZE; i++) {
         roundKey[0][i] = chave[i];
     }
@@ -557,11 +585,14 @@ void AES(const uint8_t *text, const uint8_t roundKeys[AES_ROUND_KEYS][16], uint8
             cripto[coluna * 4 + linha] = estado[linha][coluna];
         }
     }
+
+
 }
 
 int main() {
     char senha[100];
-
+    srand(time(NULL));
+    
     //1- senha usuario
     printf("Digite uma senha: ");
     fgets(senha, sizeof(senha), stdin);
@@ -570,8 +601,16 @@ int main() {
 
     //2- Derivar chave
     uint8_t chave[32];
-    keyDerive(senha, chave);
+    uint8_t salt[16]; //salt, variavel que cria outras possibilidades de senha
+
+    for(int i = 0; i < 16; i++){
+        salt[i] = rand() %100;
+    }
+
+
+    keyDerive(senha, chave, salt);
     
+
     printf("Chave derivada (32 bytes): \n");
     printHex(chave, 32);
 
@@ -593,11 +632,16 @@ int main() {
     int newTam = padding(mensagem, tam);
     if(newTam == -1) return -1;
 
-    printf("\nMensagem com Padding (%d bytes): ");
+    printf("\nMensagem com Padding (%i bytes): ");
     printHex(mensagem, newTam);
 
     //IV pra cbc
-    uint8_t iv[16] = {0}; // 0 pra testes
+    uint8_t iv[16]; // 0 pra testes
+    
+    for(int i = 0; i < 16; i++){
+        iv[i] = rand() %256;
+    }
+
 
     //criptografando
     uint8_t cripto[buffer];
@@ -620,9 +664,20 @@ int main() {
         //Atualiza anterior para o próximo bloco
         memcpy(anterior, &cripto[offset], 16);
     }
-        
+
+
+    int tamFinal = 16 + 16 + newTam;
+    uint8_t saida[tamFinal];
+
+    memcpy(saida, salt, 16);
+    memcpy(saida +16, iv, 16);
+    memcpy(saida + 32, cripto, newTam);
+
     printf("\nTexto cifrado: ");
     printHex(cripto, newTam);
+
+    printf("Buffer final (salt+iv+senha): ");
+    printHex(saida, tamFinal);
 
 
     //descriptografa
@@ -658,14 +713,6 @@ int main() {
         printf("%c", decripto[i]);
     }
     printf("\n");
-
-    // Verifica se voltou ao original
-    if(tam_final == tam && memcmp(mensagem, decripto, tam_final) == 0){
-        printf("\nMensagem voltou ao original\n");
-    } else {
-        printf("\nERRO! Mensagem não voltou ao original.\n");
-    }
-
     
     return 0;
 
