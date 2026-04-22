@@ -380,7 +380,7 @@ void keyDerive(const char *senha, uint8_t *salt, const uint8_t *chave){
 
     //copia senha pro buffer
     memcpy(buff, senha, tamSenha);
-    memcpy(buff + tamSenha, tamSenha, 16);
+    memcpy(buff + tamSenha, salt, 16);
 
     buff[tamSenha + 16] = 0;
     buff[tamSenha + 17] = 0;
@@ -497,7 +497,7 @@ int padding(uint8_t *mensagem, int tam){
 int invPadding(uint8_t *cripto, int tam){
    uint8_t value = cripto[tam-1];
    
-   if((value > buffer) || value < 1){
+    if((value > buffer) || value < 1){
     printf("ERRO! Padding inválido!\n\n");
     return -1;
    } else if(value > tam){
