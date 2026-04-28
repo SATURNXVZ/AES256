@@ -372,36 +372,38 @@ void mixColumns(uint8_t estado[4][4]){
     }
 }
 
-void keyDerive(const char *senha, uint8_t *salt, const uint8_t *chave){
-    uint8_t u[32], t[32]; //u = tentativa atual, t = soma das tentativas (acumulando)
-    uint8_t buff[128]; //buffer pra senha + salt
-
+// Versão corrigida da derivação de chave
+void keyDerive(const char *senha, const uint8_t *salt, uint8_t *chave) {
+    uint8_t u[32], t[32];
+    uint8_t buff[128];
+    
     int tamSenha = strlen(senha);
-
-    //copia senha pro buffer
+    
+    // Copia senha + salt + contador para o buffer
     memcpy(buff, senha, tamSenha);
     memcpy(buff + tamSenha, salt, 16);
-
+    
+    // Adiciona contador (big-endian)
     buff[tamSenha + 16] = 0;
     buff[tamSenha + 17] = 0;
     buff[tamSenha + 18] = 0;
     buff[tamSenha + 19] = 1;
-
-    //sha256 do buffer
-    //criando primeira "iteração"
+    
+    // Primeira iteração
     sha256(buff, tamSenha + 20, u);
     memcpy(t, u, 32);
-
-    //iteração principal
-    for(int i = 1; i < 1000000; i++){
+    
+    // Itera 1 milhão de vezes
+    for(int i = 1; i < 1000000; i++) {
         sha256(u, 32, u);
-        for(int j = 0; j < 32; j++){
+        for(int j = 0; j < 32; j++) {
             t[j] ^= u[j];
         }
     }
-
+    
     memcpy(chave, t, 32);
 }
+
 
 // Faz XOR do estado com a chave da rodad
 void add_round_key(uint8_t estado[4][4], const uint8_t roundKey[16]) {
@@ -604,11 +606,11 @@ int main() {
     uint8_t salt[16]; //salt, variavel que cria outras possibilidades de senha
 
     for(int i = 0; i < 16; i++){
-        salt[i] = rand() %100;
+        salt[i] = rand() %256;
     }
 
 
-    keyDerive(senha, chave, salt);
+    keyDerive(senha, salt, chave);
     
 
     printf("Chave derivada (32 bytes): \n");
